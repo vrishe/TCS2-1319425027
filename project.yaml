@@ -1,0 +1,5 @@
+contract:
+  func:
+    - 1.fc
+  tests:
+    - 1_tests.fc

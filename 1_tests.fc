@@ -1,0 +1,46 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; gcd
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+[int, tuple, cell, tuple, int] test__gcd__data()
+    method_id(0) {
+  int func_sel = 93344;
+
+  tuple stack = unsafe_tuple([48, 18]);
+
+  cell data = begin_cell()
+    .end_cell();
+
+  return [func_sel, stack, data, get_c7(), null()];
+}
+
+_ test__gcd(int exit_code, cell data, tuple stack, 
+  cell actions, int gas) 
+    method_id(1) {
+  throw_if(100 + exit_code, exit_code != 0);
+
+  int total = first(stack);
+  throw_if(101, total != 6);
+}
+
+[int, tuple, cell, tuple, int] test__gcd_reverse__data()
+    method_id(2) {
+  int func_sel = 93344;
+
+  tuple stack = unsafe_tuple([18, 48]);
+
+  cell data = begin_cell()
+    .end_cell();
+
+  return [func_sel, stack, data, get_c7(), null()];
+}
+
+_ test__gcd_reverse(int exit_code, cell data, tuple stack, 
+  cell actions, int gas) 
+    method_id(3) {
+  throw_if(100 + exit_code, exit_code != 0);
+
+  int total = first(stack);
+  throw_if(101, total != 6);
+}
