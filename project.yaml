@@ -1,5 +1,8 @@
 contract:
   func:
     - 1.fc
+    - 2.fc
   tests:
+    - dummy_tests.fc
     - 1_tests.fc
+    - 2_tests.fc

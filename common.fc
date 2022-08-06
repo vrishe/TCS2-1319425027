@@ -1,0 +1,4 @@
+int are_equal?(slice a, slice b) asm "SDEQ";
+
+;; int cell_empty?(cell c) asm "ISNULL";
+int cell_empty?(cell c) asm "CTOS" "SEMPTY";

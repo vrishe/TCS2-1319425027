@@ -1,0 +1,232 @@
+#include "common.fc";
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; merge_hashmaps
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+[int, tuple, cell, tuple, int] test__merge_hashmaps__empty__data()
+    method_id(2000) {
+  int func_sel = 79555;
+
+  tuple stack = unsafe_tuple([new_dict(), new_dict()]);
+
+  cell data = begin_cell()
+    .end_cell();
+
+  return [func_sel, stack, data, get_c7(), null()];
+}
+
+_ test__merge_hashmaps__empty(int exit_code, cell data, tuple stack, 
+  cell actions, int gas) 
+    method_id(2001) {
+  throw_if(1000 + exit_code, exit_code != 0);
+
+  cell md_dict = first(stack);
+  throw_if(101, ~ md_dict.dict_empty?());
+
+  cell dd_dict = second(stack);
+  throw_if(102, ~ dd_dict.dict_empty?());
+}
+
+[int, tuple, cell, tuple, int] test__merge_hashmaps__data()
+    method_id(2002) {
+  int func_sel = 79555;
+
+  slice val1 = begin_cell()
+    .store_int(431264855089, 64)
+    .end_cell()
+    .begin_parse();
+  slice val2 = begin_cell()
+    .store_int(431264855090, 64)
+    .end_cell()
+    .begin_parse();
+
+  cell dict1 = new_dict();
+  dict1~udict_add?(256, 0, val1);
+  dict1~udict_add?(256, 1, val1);
+  dict1~udict_add?(256, 3, val1);
+  dict1~udict_add?(256, 5, val1);
+
+  cell dict2 = new_dict();
+  dict2~udict_add?(256, 0, val2);
+  dict2~udict_add?(256, 1, val2);
+  dict2~udict_add?(256, 2, val2);
+  dict2~udict_add?(256, 4, val2);
+
+  tuple stack = unsafe_tuple([dict1, dict2]);
+
+  cell data = begin_cell()
+    .end_cell();
+
+  return [func_sel, stack, data, get_c7(), null()];
+}
+
+_ test__merge_hashmaps(int exit_code, cell data, tuple stack, 
+  cell actions, int gas) 
+    method_id(2003) {
+  throw_if(1000 + exit_code, exit_code != 0);
+
+  cell md_dict = first(stack);
+  cell dd_dict = second(stack);
+
+  throw_if(101, md_dict.dict_empty?());
+  throw_if(102, dd_dict.dict_empty?());
+
+  slice val1 = begin_cell()
+    .store_int(431264855089, 64)
+    .end_cell()
+    .begin_parse();
+  slice val2 = begin_cell()
+    .store_int(431264855090, 64)
+    .end_cell()
+    .begin_parse();
+
+  (slice val, int present) = md_dict.udict_get?(256, 0);
+  throw_unless(103, present & are_equal?(val1, val));
+  (      val,     present) = md_dict.udict_get?(256, 1);
+  throw_unless(103, present & are_equal?(val1, val));
+  (      val,     present) = md_dict.udict_get?(256, 2);
+  throw_unless(103, present & are_equal?(val2, val));
+  (      val,     present) = md_dict.udict_get?(256, 3);
+  throw_unless(103, present & are_equal?(val1, val));
+  (      val,     present) = md_dict.udict_get?(256, 4);
+  throw_unless(103, present & are_equal?(val2, val));
+  (      val,     present) = md_dict.udict_get?(256, 5);
+  throw_unless(103, present & are_equal?(val1, val));
+
+  (      val,     present) = dd_dict.udict_get?(256, 0);
+  throw_unless(104, present & are_equal?(val2, val));
+  (      val,     present) = dd_dict.udict_get?(256, 1);
+  throw_unless(104, present & are_equal?(val2, val));
+}
+
+[int, tuple, cell, tuple, int] test__merge_hashmaps__no_intersect__data()
+    method_id(2004) {
+  int func_sel = 79555;
+
+  slice val1 = begin_cell()
+    .store_int(431264855089, 64)
+    .end_cell()
+    .begin_parse();
+  slice val2 = begin_cell()
+    .store_int(431264855090, 64)
+    .end_cell()
+    .begin_parse();
+
+  cell dict1 = new_dict();
+  dict1~udict_add?(256, 1, val1);
+  dict1~udict_add?(256, 3, val1);
+
+  cell dict2 = new_dict();
+  dict2~udict_add?(256, 2, val2);
+  dict2~udict_add?(256, 4, val2);
+
+  tuple stack = unsafe_tuple([dict1, dict2]);
+
+  cell data = begin_cell()
+    .end_cell();
+
+  return [func_sel, stack, data, get_c7(), null()];
+}
+
+_ test__merge_hashmaps__no_intersect(int exit_code, cell data, tuple stack, 
+  cell actions, int gas) 
+    method_id(2005) {
+  throw_if(1000 + exit_code, exit_code != 0);
+
+  cell md_dict = first(stack);
+  cell dd_dict = second(stack);
+
+  throw_if(101,   md_dict.dict_empty?());
+  throw_if(102, ~ dd_dict.dict_empty?());
+
+  slice val1 = begin_cell()
+    .store_int(431264855089, 64)
+    .end_cell()
+    .begin_parse();
+  slice val2 = begin_cell()
+    .store_int(431264855090, 64)
+    .end_cell()
+    .begin_parse();
+
+  (slice val, int present) = md_dict.udict_get?(256, 1);
+  throw_unless(103, present & are_equal?(val1, val));
+  (      val,     present) = md_dict.udict_get?(256, 2);
+  throw_unless(103, present & are_equal?(val2, val));
+  (      val,     present) = md_dict.udict_get?(256, 3);
+  throw_unless(103, present & are_equal?(val1, val));
+  (      val,     present) = md_dict.udict_get?(256, 4);
+  throw_unless(103, present & are_equal?(val2, val));
+}
+
+[int, tuple, cell, tuple, int] test__merge_hashmaps__types_mismatch__data()
+    method_id(2006) {
+  int func_sel = 79555;
+
+  slice val1 = begin_cell()
+    .store_int(431264855089, 64)
+    .end_cell()
+    .begin_parse();
+  slice val2 = begin_cell()
+    .store_int(431264855090, 64)
+    .end_cell()
+    .begin_parse();
+
+  cell dict1 = new_dict();
+  dict1~idict_add?(256, 0, val1);
+  dict1~idict_add?(256, 1, val1);
+  dict1~idict_add?(256, 3, val1);
+  dict1~idict_add?(256, 5, val1);
+
+  cell dict2 = new_dict();
+  dict2~idict_add?(256, 0, val2);
+  dict2~idict_add?(256, 1, val2);
+  dict2~idict_add?(256, 2, val2);
+  dict2~idict_add?(256, 4, val2);
+
+  tuple stack = unsafe_tuple([dict1, dict2]);
+
+  cell data = begin_cell()
+    .end_cell();
+
+  return [func_sel, stack, data, get_c7(), null()];
+}
+
+_ test__merge_hashmaps__types_mismatch(int exit_code, cell data, tuple stack, 
+  cell actions, int gas) 
+    method_id(2007) {
+  throw_if(1000 + exit_code, exit_code != 0);
+
+  cell md_dict = first(stack);
+  cell dd_dict = second(stack);
+
+  throw_if(101, md_dict.dict_empty?());
+  throw_if(102, dd_dict.dict_empty?());
+
+  slice val1 = begin_cell()
+    .store_int(431264855089, 64)
+    .end_cell()
+    .begin_parse();
+  slice val2 = begin_cell()
+    .store_int(431264855090, 64)
+    .end_cell()
+    .begin_parse();
+
+  (slice val, int present) = md_dict.idict_get?(256, 0);
+  throw_unless(103, present & are_equal?(val1, val));
+  (      val,     present) = md_dict.idict_get?(256, 1);
+  throw_unless(103, present & are_equal?(val1, val));
+  (      val,     present) = md_dict.idict_get?(256, 2);
+  throw_unless(103, present & are_equal?(val2, val));
+  (      val,     present) = md_dict.idict_get?(256, 3);
+  throw_unless(103, present & are_equal?(val1, val));
+  (      val,     present) = md_dict.idict_get?(256, 4);
+  throw_unless(103, present & are_equal?(val2, val));
+  (      val,     present) = md_dict.idict_get?(256, 5);
+  throw_unless(103, present & are_equal?(val1, val));
+
+  (      val,     present) = dd_dict.idict_get?(256, 0);
+  throw_unless(104, present & are_equal?(val2, val));
+  (      val,     present) = dd_dict.idict_get?(256, 1);
+  throw_unless(104, present & are_equal?(val2, val));
+}

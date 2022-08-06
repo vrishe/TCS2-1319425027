@@ -1,0 +1,26 @@
+{-
+
+  This is necessary, so we could assign desired method IDs
+  to out testing methods.
+
+ -}
+
+() dummy() method_id(75032) { }
+
+[int, tuple, cell, tuple, int] test__dummy__data()
+    method_id(0) {
+  int func_sel = 75032;
+
+  tuple stack = unsafe_tuple([]);
+
+  cell data = begin_cell()
+    .end_cell();
+
+  return [func_sel, stack, data, get_c7(), null()];
+}
+
+_ test__dummy(int exit_code, cell data, tuple stack, 
+  cell actions, int gas) 
+    method_id(1) {
+      ;; nothing to do
+}

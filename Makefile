@@ -1,8 +1,9 @@
 .PHONY: archive
 archive:
 	@echo Archiving strategy
-	zip solution.zip 1.fc participant.json
+	zip solution.zip main.fc 1.fc 2.fc participant.json
 
 .PHONY: clean
 clean:
-	@rm -f solution.zip
+	rm -f solution.zip
+	rm -rf build/*

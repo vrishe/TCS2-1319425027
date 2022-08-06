@@ -5,8 +5,7 @@
   or equal to 1 and less than 1048576.
 -}
 
-() recv_internal() {
-}
+#include "main.fc";
 
 ;; testable
 (int) gcd(int a, int b) method_id {
