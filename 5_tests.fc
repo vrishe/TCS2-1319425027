@@ -1,0 +1,29 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; encode_address
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+[int, tuple, cell, tuple, int] test__encode_address__data()
+    method_id(5000) {
+  int func_sel = 91603;
+
+  ;; 11 FF FCB91A3A3816D0F7B8C2C76108B8A9BC5A6B7A55BD79F8AB101C52DB29232260 3278
+  ;; Ef/8uRo6OBbQ97jCx2EIuKm8Wmt6Vb15+KsQHFLbKSMiYDJ4
+  ;; Ef_8uRo6OBbQ97jCx2EIuKm8Wmt6Vb15-KsQHFLbKSMiYDJ4
+  
+  ;; EQCDizzRCc4HV-h2Rb6h0svFgxVsJN1W4cyot5is5HfqS1L1
+  tuple stack = unsafe_tuple(["EQCDizzRCc4HV-h2Rb6h0svFgxVsJN1W4cyot5is5HfqS1L1"a]);
+
+  cell data = begin_cell()
+    .end_cell();
+
+  return [func_sel, stack, data, get_c7(), null()];
+}
+
+_ test__encode_address__empty(int exit_code, cell data, tuple stack, 
+  cell actions, int gas) 
+    method_id(5001) {
+  throw_if(1000 + exit_code, exit_code != 0);
+
+  slice addr_str = first(stack);
+  throw_if(101, ~ are_equal?("EQCDizzRCc4HV-h2Rb6h0svFgxVsJN1W4cyot5is5HfqS1L1", addr_str));
+}

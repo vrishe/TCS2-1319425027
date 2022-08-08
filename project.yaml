@@ -1,8 +1,15 @@
 contract:
   func:
+    - typehelpers.fc
     - 1.fc
     - 2.fc
+    # - 3.fc
+    # - 4.fc
+    - 5.fc
   tests:
     - dummy_tests.fc
     - 1_tests.fc
     - 2_tests.fc
+    # - 3_tests.fc
+    # - 4_tests.fc
+    - 5_tests.fc
