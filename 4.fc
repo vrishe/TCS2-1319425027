@@ -23,76 +23,180 @@
   Intermediate representation can be arbitrary.
 -}
 
+#include "main.fc";
 
-() recv_internal() {
+forall X -> (X) get_at(tuple t, int i) asm "INDEXVAR";
+forall X -> X last(tuple t) asm "LAST";
+
+(int, int) get_capacity(builder b) asm "BREMBITREFS";
+(int, int) get_volume  (builder b) asm "BBITREFS";
+
+(slice, int) ~load_int_smart(slice s) method_id {
+  int p = s~load_uint(4);
+  if p {
+    int n = s~load_uint(1);
+    int v = s~load_uint(1 << p);
+    return(s, n ? - v : v);
+  }
+  return(s, 0);
+}
+
+(int, int, int) smart_store_repr(int i) method_id {
+  if i == 0 { return(0, 0, 0); }
+
+  int n = i < 0;
+  if n { i = - i; }
+
+  int p = 5; ;; 2^p = 32-bit, a good start
+  while i > (~ (~ 0 << (1 << p))) {
+    p += 1;
+  }
+
+  if i < (~ (~ 0 << (1 << p))) {
+    do {
+      p -= 1;
+    }
+    until i >= (~ (~ 0 << (1 << p)));
+    p += 1;
+  }
+
+  return(p, n, i);
+}
+
+int estimate_storage_size((int, int, int) repr) {
+  (int p, _, _) = repr;
+  return 4 + (p > 0) & (1 + (1 << p));
+}
+
+(builder) store_int_smart_repr(builder b, (int, int, int) repr) method_id {
+  (int p, int n, int i) = repr;
+  if p { return(b.store_uint(p, 4).store_uint(n & 0x1, 1).store_uint(i, (1 << p))); }
+  return(b.store_uint(0, 4));
+}
+
+(builder, ()) ~store_int_smart_repr(builder b, (int, int, int) repr) method_id {
+  return (b.store_int_smart_repr(repr), ());
+}
+
+(builder) store_int_smart(builder b, int i) method_id {
+  return(b.store_int_smart_repr(smart_store_repr(i)));
+}
+
+(builder, ()) ~store_int_smart(builder b, int i) method_id {
+  return (b.store_int_smart_repr(smart_store_repr(i)), ());
+}
+
+;; 0 - null
+;; 1 - int
+;; 2 - cell
+;; 3 - slice
+;; 4 - tuple
+
+(cell) serialize(tuple values);
+
+(builder, int) serialize_impl(int i, int len, tuple values) method_id {
+  builder b = begin_cell();
+
+  while i < len {
+    var v = values.get_at(i);
+
+    (int bits, int refs) = b.get_capacity();
+
+    int sz = 3;
+    if is_null(v) {
+      if bits < sz { return(b, i); }
+
+      b = b.store_uint(0, 3);
+    }
+    else { if is_int(v) {
+      var r = smart_store_repr(force_cast_to_int(v));
+      sz += estimate_storage_size(r);
+      if bits < sz { return(b, i); }
+
+      b = b.store_uint(1, 3)
+        .store_int_smart_repr(r);
+    }
+    else { if is_cell(v) {
+      if refs < 2 { return(b, i); }
+      b = b.store_uint(2, 3)
+        .store_ref(force_cast_to_cell(v));
+    }
+    else { if is_slice(v) {
+      if refs < 2 { return(b, i); }
+      b = b.store_uint(3, 3)
+        .store_ref(begin_cell()
+          .store_slice(force_cast_to_slice(v))
+          .end_cell());
+    }
+    else { if is_tuple(v) {
+      if refs < 2 { return(b, i); }
+      b = b.store_uint(4, 3)
+        .store_ref(serialize(force_cast_to_tuple(v)));
+    } } } } }
+
+    i += 1;
+  }
+
+  return(b, -1);
 }
 
 ;; testable
 (cell) serialize(tuple values) method_id {
+  tuple t = empty_tuple();
+
+  builder b = null();
+
+  int i = 0;
+  int len = values.tuple_length();
+  do {
+    (b, i) = serialize_impl(i, len, values);
+    t~tpush(b);
+  }
+  until(i < 0);
+
+  while t.tuple_length() > 1 {
+    builder next = t~tpop();
+    builder prev = t~tpop();
+
+    t~tpush(prev.store_ref(next.end_cell()));
+  }
+
+  b = t.last();
+  return(b.end_cell());
 }
 
 ;; testable
 (tuple) deserialize(cell serialized) method_id {
-}
-
-;; ==== Illustrative material ====
-builder serialize_element(builder b, var x) {
-  if(is_null(x)) {
-    b~store_uint(0,3);
-  }
-  if(is_int(x)) {
-    ;; before this point compiler do not know true type of x
-    ;; force it to be int
-    int i_x = force_cast_to_int(x);
-    b = b.store_uint(1,3).store_int(i_x, 257);
-  }
-  if(is_cell(x)) {
-    ;; before this point compiler do not know true type of x
-    ;; force it to be cell
-    cell c_x = force_cast_to_cell(x);
-    b = b.store_uint(2,3).store_ref(c_x);
-  }
-  if(is_slice(x)) {
-    ;; before this point compiler do not know true type of x
-    ;; force it to be slice
-    slice s_x = force_cast_to_slice(x);
-    b = b.store_uint(3,3).store_ref(begin_cell().store_slice(s_x).end_cell());
-  }
-  return b;
-}
-
-(slice, tuple) deserialize_element_to_tuple(slice s, tuple t) {
-  int element_type = s~load_uint(3);
-  if(element_type == 0) {
-    t~tpush(null());
-  }
-  if(element_type == 1) {
-    t~tpush(s~load_int(257));
-  }
-  if(element_type == 2) {
-    t~tpush(s~load_ref());
-  }
-  if(element_type == 3) {
-    t~tpush(s~load_ref().begin_parse());
-  }
-  return (s,t);
-}
-
-cell serialize_t3(tuple three_elements) method_id {
-  throw_unless(777, three_elements.tuple_length() == 3);
-  builder srl = begin_cell();
-  srl = serialize_element(srl, three_elements.first());
-  srl = serialize_element(srl, three_elements.second());
-  srl = serialize_element(srl, three_elements.third());
-  return srl.end_cell();
-}
-
-tuple deserialize_t3(cell sc) method_id {
-  slice s = sc.begin_parse();
   tuple t = empty_tuple();
-  repeat (3) {
-    (s,t) = deserialize_element_to_tuple(s,t);
+
+  slice s = serialized.begin_parse();
+  while ~ s.slice_empty?() {
+    if s.slice_bits() {
+      int tag = s~load_uint(3);
+      if(tag == 0) {
+        t~tpush(null());
+      }
+      else { if(tag == 1) {
+        t~tpush(s~load_int_smart());
+      }
+      else { if(tag == 2) {
+        t~tpush(s~load_ref());
+      }
+      else { if(tag == 3) {
+        t~tpush(s~load_ref().begin_parse());
+      }
+      else { if(tag == 4) {
+        t~tpush(deserialize(s~load_ref()));
+      } } } } }
+    }
+    else {
+      s = s~load_ref().begin_parse();
+    }
   }
-  return t;
+
+  return(t);
 }
 
+(tuple, tuple) roundtrip(tuple t) method_id {
+  return(t, deserialize(serialize(t)));
+}

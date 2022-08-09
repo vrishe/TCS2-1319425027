@@ -1,0 +1,211 @@
+#include "typehelpers.fc";
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; roundtrip
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+[int, tuple, cell, tuple, int] test__roundtrip__data()
+    method_id(4000) {
+  int func_sel = 96936;
+
+  var t = empty_tuple();
+  t~tpush(1);
+  t~tpush(null());
+  t~tpush(0);
+  t~tpush(0xdeadbeef);
+
+  tuple stack = unsafe_tuple([t]);
+
+  cell data = begin_cell()
+    .end_cell();
+
+  return [func_sel, stack, data, get_c7(), null()];
+}
+
+_ test__roundtrip(int exit_code, cell data, tuple stack, 
+  cell actions, int gas) 
+    method_id(4001) {
+  throw_if(1000 + exit_code, exit_code != 0);
+
+  tuple a = stack.first();
+  tuple b = stack.second();
+
+  throw_unless(101, a.tuple_length() == b.tuple_length());
+
+  int n = 10;
+  repeat a.tuple_length() {
+    var va = a~tpop();
+    var vb = b~tpop();
+
+    if is_null(va) {
+      throw_unless(102 + n, is_null(vb));
+    }
+    else { if is_int(va) {
+      throw_unless(103 + n, is_int(vb)
+        & (force_cast_to_int(va) == force_cast_to_int(vb)));
+    }
+    else { 
+      throw_if(104 + n, -1);
+    } }
+
+    n += 10;
+  }
+}
+
+[int, tuple, cell, tuple, int] test__roundtrip__refs_overfill__data()
+    method_id(4002) {
+  int func_sel = 96936;
+
+  var t = empty_tuple();
+
+  int n = 0;
+  repeat 9 {
+    n += 1;
+
+    t~tpush(begin_cell().store_uint(n, 32).end_cell());
+  }
+
+  tuple stack = unsafe_tuple([t]);
+
+  cell data = begin_cell()
+    .end_cell();
+
+  return [func_sel, stack, data, get_c7(), null()];
+}
+
+_ test__roundtrip__refs_overfill(int exit_code, cell data, tuple stack, 
+  cell actions, int gas) 
+    method_id(4003) {
+  throw_if(1000 + exit_code, exit_code != 0);
+
+  tuple a = stack.first();
+  tuple b = stack.second();
+
+  throw_unless(101, a.tuple_length() == b.tuple_length());
+
+  int n = 10;
+  repeat a.tuple_length() {
+    var va = a~tpop();
+    var vb = b~tpop();
+
+    if is_cell(va) {
+      throw_unless(102 + n, is_cell(vb)
+        & are_equal?(force_cast_to_cell(va).begin_parse(), 
+          force_cast_to_cell(vb).begin_parse()));
+    }
+    else {  
+      throw_if(103 + n, -1);
+    }
+
+    n += 10;
+  }
+}
+
+[int, tuple, cell, tuple, int] test__roundtrip__sophisticated__data()
+    method_id(4004) {
+  int func_sel = 96936;
+
+  var t = empty_tuple();
+
+  ;; [I, I, I, [c, [1, 2, 3, 4], s], I]
+
+  t~tpush(-1);
+  t~tpush(0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF);
+  t~tpush(0xFFFFFFFFFFFFAE8FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFBFAFFFFFFFFF8);
+
+  var t' = empty_tuple();
+  {
+    t'~tpush(begin_cell()
+      .store_int(4004, 32)
+      .store_uint(96936, 64)
+      .end_cell());
+    var t'' = empty_tuple();
+    {
+      t''~tpush(1);
+      t''~tpush(2);
+      t''~tpush(3);
+      t''~tpush(4);
+    }
+    t'~tpush(t'');
+    t'~tpush("af5e549f-b5d5-422c-8955-0b8c11f03f90");
+  }
+  t~tpush(t');
+  t~tpush(0xBEBEBEBEBEBEBEBEBEBEBEBEBEBEBEBEBEBEBEBEBEBEBEBEBEBEBEBEBEBEBEBE);
+
+  tuple stack = unsafe_tuple([t]);
+
+  cell data = begin_cell()
+    .end_cell();
+
+  return [func_sel, stack, data, get_c7(), null()];
+}
+
+_ test__roundtrip__sophisticated(int exit_code, cell data, tuple stack, 
+  cell actions, int gas) 
+    method_id(4005) {
+  throw_if(1000 + exit_code, exit_code != 0);
+
+  ;; [I, I, I, [c, [1, 2, 3, 4], s], I]
+
+  tuple ta = stack.first();
+  tuple tb = stack.second();
+  {
+    throw_unless(101, ta.tuple_length()
+                   == tb.tuple_length());
+
+    int ia = ta~tpop();
+    int ib = tb~tpop();
+    throw_unless(102, ia == ib);
+
+    tuple ta' = ta~tpop();
+    tuple tb' = tb~tpop();
+    {
+      throw_unless(111, ta'.tuple_length()
+                     == tb'.tuple_length());
+
+      slice sa = ta'~tpop();
+      slice sb = tb'~tpop();
+      throw_unless(112, are_equal?(sa, sb));
+
+      tuple ta'' = ta'~tpop();
+      tuple tb'' = tb'~tpop();
+      {
+        throw_unless(121, ta''.tuple_length()
+                       == tb''.tuple_length());
+
+            ia = ta''~tpop();
+            ib = tb''~tpop();
+        throw_unless(122, ia == ib);
+
+            ia = ta''~tpop();
+            ib = tb''~tpop();
+        throw_unless(123, ia == ib);
+
+            ia = ta''~tpop();
+            ib = tb''~tpop();
+        throw_unless(124, ia == ib);
+
+            ia = ta''~tpop();
+            ib = tb''~tpop();
+        throw_unless(125, ia == ib);
+      }
+
+      cell ca = ta'~tpop();
+      cell cb = tb'~tpop();
+      throw_unless(113, are_equal?(ca.begin_parse(),
+                                   cb.begin_parse()));
+    }
+
+        ia = ta~tpop();
+        ib = tb~tpop();
+    throw_unless(103, ia == ib);
+
+        ia = ta~tpop();
+        ib = tb~tpop();
+    throw_unless(104, ia == ib);
+
+        ia = ta~tpop();
+        ib = tb~tpop();
+    throw_unless(105, ia == ib);
+  }
+}
