@@ -15,11 +15,233 @@
   Documentation on TL-B schemes can be found in https://ton.org/docs/#/overviews/TL-B
 -}
 
-() recv_internal() {
+#include "main.fc";
+
+{-
+
+addr_none$00 = MsgAddressExt;
+addr_extern$01 len:(## 9) external_address:(bits len) 
+             = MsgAddressExt;
+anycast_info$_ depth:(#<= 30) { depth >= 1 }
+   rewrite_pfx:(bits depth) = Anycast;
+addr_std$10 anycast:(Maybe Anycast) 
+   workchain_id:int8 address:bits256  = MsgAddressInt;
+addr_var$11 anycast:(Maybe Anycast) addr_len:(## 9) 
+   workchain_id:int32 address:(bits addr_len) = MsgAddressInt;
+_ _:MsgAddressInt = MsgAddress;
+_ _:MsgAddressExt = MsgAddress;
+
+//
+var_uint$_ {n:#} len:(#< n) value:(uint (len * 8))
+         = VarUInteger n;
+var_int$_ {n:#} len:(#< n) value:(int (len * 8)) 
+        = VarInteger n;
+nanograms$_ amount:(VarUInteger 16) = Grams; 
+
+// ordinary Hashmap / HashmapE, with fixed length keys
+//
+hm_edge#_ {n:#} {X:Type} {l:#} {m:#} label:(HmLabel ~l n) 
+          {n = (~m) + l} node:(HashmapNode m X) = Hashmap n X;
+
+hmn_leaf#_ {X:Type} value:X = HashmapNode 0 X;
+hmn_fork#_ {n:#} {X:Type} left:^(Hashmap n X) 
+           right:^(Hashmap n X) = HashmapNode (n + 1) X;
+
+hml_short$0 {m:#} {n:#} len:(Unary ~n) {n <= m} s:(n * Bit) = HmLabel ~n m;
+hml_long$10 {m:#} n:(#<= m) s:(n * Bit) = HmLabel ~n m;
+hml_same$11 {m:#} v:Bit n:(#<= m) = HmLabel ~n m;
+
+unary_zero$0 = Unary ~0;
+unary_succ$1 {n:#} x:(Unary ~n) = Unary ~(n + 1);
+
+hme_empty$0 {n:#} {X:Type} = HashmapE n X;
+hme_root$1 {n:#} {X:Type} root:^(Hashmap n X) = HashmapE n X;
+
+//
+extra_currencies$_ dict:(HashmapE 32 (VarUInteger 32)) 
+                 = ExtraCurrencyCollection;
+currencies$_ grams:Grams other:ExtraCurrencyCollection 
+           = CurrencyCollection;
+
+int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool
+  src:MsgAddressInt dest:MsgAddressInt 
+  value:CurrencyCollection ihr_fee:Grams fwd_fee:Grams
+  created_lt:uint64 created_at:uint32 = CommonMsgInfo;
+
+ext_in_msg_info$10 src:MsgAddressExt dest:MsgAddressInt 
+  import_fee:Grams = CommonMsgInfo;
+
+ext_out_msg_info$11 src:MsgAddressInt dest:MsgAddressExt
+  created_lt:uint64 created_at:uint32 = CommonMsgInfo;
+
+tick_tock$_ tick:Bool tock:Bool = TickTock;
+
+_ split_depth:(Maybe (## 5)) special:(Maybe TickTock)
+  code:(Maybe ^Cell) data:(Maybe ^Cell)
+  library:(HashmapE 256 SimpleLib) = StateInit;
+  
+simple_lib$_ public:Bool root:^Cell = SimpleLib;
+
+message$_ {X:Type} info:CommonMsgInfo
+  init:(Maybe (Either StateInit ^StateInit))
+  body:(Either X ^X) = Message X;
+  
+_ (Message Any) = MessageAny;
+
+-}
+
+forall X -> tuple T_(X x) asm "NOP";
+
+(slice, (slice, int)) ~load_msg_addr?(slice s) asm "LDMSGADDRQ"
+  "IF:<{ SWAP TRUE }>ELSE<{ PUSHNULL FALSE }>";
+(slice, (int, int)) ~load_uint?(slice s, int len) asm "LDUXQ"
+  "IF:<{ SWAP TRUE }>ELSE<{ ZERO FALSE }>";
+
+(slice, (int, int)) ~load_grams?(slice s) method_id {
+  (int l, int ok) = s~load_uint?(4);
+  return(s, ok ? s~load_uint?(8 * l) : (0, 0));
 }
 
+(slice, int) ~skip_bits?(slice s, int bits) asm "LDSLICEXQ"
+  "IF:<{ SWAP DROP TRUE }>ELSE<{ FALSE }>";
+
+(slice) addr_none() asm "ZERO" "NEWC" "TWO" "STUX" "ENDC" "CTOS";
+(int) is_addr_none?(slice addr) method_id {
+  (int val, int ok) = addr~load_uint?(2);
+  return ok & (val == 0);
+}
+
+(int) validate_hashmap(cell hashmap) method_id {
+  return(-1);
+}
 
 ;; testable
 (int, tuple) validate_message(cell message) method_id {
-  return (-1, unsafe_tuple([null(), null(), 0]));
+  slice ds = message.begin_parse();
+
+  (int tag, int ok) = ds~load_uint?(2);
+  if ~ ok | (tag > 3) { return (0, null()); }
+
+  slice src = null();
+  slice dst = null();
+  int amount = null();
+
+  int ref_count = ds.slice_refs();
+
+  if tag == 3 {
+    ;; ext_out_msg_info$11 src:MsgAddressInt dest:MsgAddressExt
+    ;;   created_lt:uint64 created_at:uint32 = CommonMsgInfo;
+    (src, int ok) = ds~load_msg_addr?();
+    if ~ ok { return (0, null()); }
+    (dst, int ok) = ds~load_msg_addr?();
+    if ~ ok { return (0, null()); }
+
+    if ~ ds~skip_bits?(96) { return (0, null()); }
+  }
+  else { if tag == 2 {
+    ;; ext_in_msg_info$10 src:MsgAddressExt dest:MsgAddressInt 
+    ;;   import_fee:Grams = CommonMsgInfo;
+    (src, int ok) = ds~load_msg_addr?();
+    if ~ ok { return (0, null()); }
+    (dst, int ok) = ds~load_msg_addr?();
+    if ~ ok { return (0, null()); }
+
+    (_, int ok) = ds~load_grams?();
+    if ~ ok { return (0, null()); }
+  }
+  else {
+    ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool
+    ;;   src:MsgAddressInt dest:MsgAddressInt 
+    ;;   value:CurrencyCollection ihr_fee:Grams fwd_fee:Grams
+    ;;   created_lt:uint64 created_at:uint32 = CommonMsgInfo;
+    ;;throw_unless(35, tag); ;; IHR SHOULD be disabled
+    (int bb, int ok) = ds~load_uint?(2);
+    if ~ ok { return (0, null()); }
+    if bb == 3 { return (0, null()); }
+
+    (src, int ok) = ds~load_msg_addr?();
+    if ~ ok { return (0, null()); }
+    (dst, int ok) = ds~load_msg_addr?();
+    if ~ ok { return (0, null()); }
+
+    (amount, int ok) = ds~load_grams?();
+    if ~ ok { return (0, null()); }
+
+    ;;throw_if(35, ds~load_uint(1)); ;; we don't expect for ExtraCurrencyCollection
+    (int maybe, int ok) = ds~load_uint?(1);
+    if ~ ok { return (0, null()); }
+    if maybe {
+      ref_count -= 1;
+      if ref_count < 0 { return (0, null()); }
+      if ~ ds~load_ref().validate_hashmap() { return (0, null()); }
+    }
+
+    (_, int ok) = ds~load_grams?();
+    if ~ ok { return (0, null()); }
+    (_, int ok) = ds~load_grams?();
+    if ~ ok { return (0, null()); }
+
+    if ~ ds~skip_bits?(96) { return (0, null()); }
+  } }
+
+  if ds~load_uint(1) {
+    ;; init is present
+    slice is = ds;
+    int init_ref_count = ref_count;
+
+    int is_cell_ref = ~ ds~load_uint(1);
+    if is_cell_ref { 
+      is = ds~load_ref().begin_parse(); 
+      init_ref_count = is.slice_refs();
+    }
+
+    ;; tick_tock$_ tick:Bool tock:Bool = TickTock;
+
+    ;; _ split_depth:(Maybe (## 5)) special:(Maybe TickTock)
+    ;;   code:(Maybe ^Cell) data:(Maybe ^Cell)
+    ;;   library:(HashmapE 256 SimpleLib) = StateInit;
+
+    (int maybe, int ok) = is~load_uint?(1);
+    if ~ ok | (maybe & ~ is~skip_bits?(5)) { return (0, null()); }
+    (int maybe, int ok) = is~load_uint?(1);
+    if ~ ok | (maybe & ~ is~skip_bits?(2)) { return (0, null()); }
+
+    (int maybe, int ok) = is~load_uint?(1);
+    if ~ ok { return (0, null()); }
+    if maybe {
+      init_ref_count -= 1;
+      if init_ref_count < 0 { return (0, null()); }
+      if ~ is~load_ref().validate_hashmap() { return (0, null()); }
+    }
+    (int maybe, int ok) = is~load_uint?(1);
+    if ~ ok { return (0, null()); }
+    if maybe {
+      init_ref_count -= 1;
+      if init_ref_count < 0 { return (0, null()); }
+      if ~ is~load_ref().validate_hashmap() { return (0, null()); }
+    }
+
+    ;;throw_if(35, is~load_uint(1)); ;; we don't expect for library
+    (int maybe, int ok) = is~load_uint?(1);
+    if ~ ok { return (0, null()); }
+    if maybe {
+      init_ref_count -= 1;
+      if init_ref_count < 0 { return (0, null()); }
+      if ~ is~load_ref().validate_hashmap() { return (0, null()); }
+    }
+
+    if ~ is_cell_ref { ref_count = init_ref_count; }
+  }
+
+  ;; Check body
+  if ds~load_uint(1) {
+    if ds.slice_bits() <= 0 { return (0, null()); }
+  }
+  else {
+    ref_count -= 1;
+    if ref_count < 0 { return (0, null()); }
+  }
+
+  return (-1, T_([src.is_addr_none?() ? null() : src, 
+    dst.is_addr_none?() ? null() : dst, amount]));
 }

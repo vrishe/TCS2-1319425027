@@ -1,0 +1,141 @@
+#include "typehelpers.fc";
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; validate_message
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+[int, tuple, cell, tuple, int] test__validate_message__invalid_empty__data()
+    method_id(3000) {
+  int func_sel = 107371;
+
+  cell msg = begin_cell()
+    .end_cell();
+
+  tuple stack = unsafe_tuple([msg]);
+
+  cell data = begin_cell()
+    .end_cell();
+
+  return [func_sel, stack, data, get_c7(), null()];
+}
+
+_ test__validate_message__invalid_empty(int exit_code, cell data, tuple stack, 
+  cell actions, int gas) 
+    method_id(3001) {
+  throw_if(1000 + exit_code, exit_code != 0);
+
+  int result = first(stack);
+  throw_if(101, result);
+
+  throw_unless(102, is_null(second(stack)));
+}
+
+[int, tuple, cell, tuple, int] test__validate_message__valid_int_msg_info__data()
+    method_id(3002) {
+  int func_sel = 107371;
+
+  var their_addr = begin_cell()
+    .store_uint(1, 2)
+    .store_uint(3, 9)
+    .store_uint(5, 3)
+    .end_cell()
+    .begin_parse();
+
+  var contract_addr = begin_cell()
+    .store_uint(1, 2)
+    .store_uint(3, 9)
+    .store_uint(1, 3)
+    .end_cell()
+    .begin_parse();
+
+  var msg_body = begin_cell()
+    .store_uint(0xdeadd00d, 32)
+    .end_cell();
+
+  cell msg = begin_cell()
+    .store_uint(0x6, 4)
+    .store_slice(their_addr)
+    .store_slice(contract_addr)
+    .store_grams(2352)
+    .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+    .store_ref(msg_body)
+    .end_cell();
+
+  tuple stack = unsafe_tuple([msg]);
+
+  cell data = begin_cell()
+    .end_cell();
+
+  return [func_sel, stack, data, get_c7(), null()];
+}
+
+_ test__validate_message__valid_int_msg_info(int exit_code, cell data, tuple stack, 
+  cell actions, int gas) 
+    method_id(3003) {
+  throw_if(1000 + exit_code, exit_code != 0);
+
+  int result = first(stack);
+  throw_unless(101, result);
+
+  tuple payload = second(stack);
+  throw_unless(102, payload.tuple_length() == 3);
+
+  var their_addr = begin_cell()
+    .store_uint(1, 2)
+    .store_uint(3, 9)
+    .store_uint(5, 3)
+    .end_cell()
+    .begin_parse();
+  throw_unless(103, are_equal?(payload.first(), their_addr));
+
+  var contract_addr = begin_cell()
+    .store_uint(1, 2)
+    .store_uint(3, 9)
+    .store_uint(1, 3)
+    .end_cell()
+    .begin_parse();
+  throw_unless(104, are_equal?(payload.second(), contract_addr));
+  throw_if(105, payload.third() != 2352);
+}
+
+;; [int, tuple, cell, tuple, int] test__validate_message__valid__data()
+;;     method_id(3002) {
+;;   int func_sel = 107371;
+
+;;   tuple stack = unsafe_tuple([]);
+
+;;   cell data = begin_cell()
+;;     .end_cell();
+
+;;   return [func_sel, stack, data, get_c7(), null()];
+;; }
+
+;; _ test__validate_message__valid(int exit_code, cell data, tuple stack, 
+;;   cell actions, int gas) 
+;;     method_id(3003) {
+;;   throw_if(1000 + exit_code, exit_code != 0);
+
+;;   int result = first(stack);
+;;   throw_unless(101, result);
+;; }
+
+;; [int, tuple, cell, tuple, int] test__validate_message__valid_missing_fields__data()
+;;     method_id(3004) {
+;;   int func_sel = 107371;
+
+;;   tuple stack = unsafe_tuple([]);
+
+;;   cell data = begin_cell()
+;;     .end_cell();
+
+;;   return [func_sel, stack, data, get_c7(), null()];
+;; }
+
+;; _ test__validate_message__valid_missing_fields(int exit_code, cell data, tuple stack, 
+;;   cell actions, int gas) 
+;;     method_id(3005) {
+;;   throw_if(1000 + exit_code, exit_code != 0);
+
+;;   int result = first(stack);
+;;   throw_unless(101, result);
+;; }
